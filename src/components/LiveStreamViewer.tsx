@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Streamer, LiveComment, GiftEvent, PKBattleState, UserWallet } from '../types';
 import { PKBattleOverlay } from './PKBattleOverlay';
 import { Heart, MessageCircle, Share2, Gift, Volume2, VolumeX, Users, Gem, Sparkles, Send, Flame, ChevronUp, ChevronDown } from 'lucide-react';
+import { SocialShareModal } from './SocialShareModal';
 
 interface LiveStreamViewerProps {
-  streamer: Streamer;
+  streamer: Streamer | null;
   wallet: UserWallet;
   pkBattle: PKBattleState | null;
   comments: LiveComment[];
@@ -13,7 +14,10 @@ interface LiveStreamViewerProps {
   onOpenGiftStore: () => void;
   onNextStream: () => void;
   onPrevStream: () => void;
+  isFollowing?: boolean;
   onToggleFollow?: () => void;
+  onlyMutualLive?: boolean;
+  onToggleOnlyMutualLive?: () => void;
 }
 
 export const LiveStreamViewer: React.FC<LiveStreamViewerProps> = ({
@@ -26,12 +30,63 @@ export const LiveStreamViewer: React.FC<LiveStreamViewerProps> = ({
   onOpenGiftStore,
   onNextStream,
   onPrevStream,
+  isFollowing: isFollowingExternal = false,
+  onToggleFollow,
+  onlyMutualLive = true,
+  onToggleOnlyMutualLive,
 }) => {
   const [commentInput, setCommentInput] = useState('');
   const [isMuted, setIsMuted] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
+  const [internalFollowing, setInternalFollowing] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
+  if (!streamer) {
+    return (
+      <div className="relative w-full h-[calc(100vh-112px)] max-w-md mx-auto bg-stone-950 text-white overflow-hidden flex flex-col items-center justify-center p-6 text-center shadow-2xl border-x border-stone-800/80">
+        <div className="p-4 bg-purple-600/20 border border-purple-500/40 rounded-3xl mb-4 shadow-[0_0_30px_rgba(168,85,247,0.3)]">
+          <Users className="w-12 h-12 text-purple-400 animate-pulse" />
+        </div>
+        <h2 className="text-xl font-black text-white">Transmisiones de Amigos Mutuos</h2>
+        <p className="text-xs text-stone-400 mt-2 max-w-xs font-medium leading-relaxed">
+          Solo se muestran en vivo las personas que se siguen mutuamente. Sigue a tus creadores favoritos para ver sus transmisiones exclusivas en vivo.
+        </p>
+        {onToggleOnlyMutualLive && (
+          <button
+            onClick={onToggleOnlyMutualLive}
+            className="mt-6 px-6 py-3 bg-gradient-to-r from-rose-600 to-pink-600 text-white font-black text-xs rounded-2xl shadow-[0_0_20px_rgba(244,63,94,0.4)] active:scale-95 transition-all"
+          >
+            Ver Todas las Transmisiones Públicas
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const isFollowing = onToggleFollow ? isFollowingExternal : internalFollowing;
+
+  const handleFollowClick = () => {
+    if (onToggleFollow) {
+      onToggleFollow();
+    } else {
+      setInternalFollowing(!internalFollowing);
+    }
+  };
   const [floatingHearts, setFloatingHearts] = useState<{ id: number; x: number }[]>([]);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  if (!streamer) {
+    return (
+      <div className="relative w-full max-w-md h-[82vh] bg-stone-950 border border-white/10 rounded-[32px] overflow-hidden flex flex-col items-center justify-center p-6 text-center shadow-2xl">
+        <div className="p-4 bg-rose-600/20 rounded-full border border-rose-500/30 mb-3 shadow-[0_0_20px_rgba(244,63,94,0.4)]">
+          <Flame className="w-10 h-10 text-rose-500 animate-pulse" />
+        </div>
+        <h3 className="text-base font-black text-white">No hay transmisión activa</h3>
+        <p className="text-xs text-stone-400 mt-1 max-w-xs font-medium">
+          Busca por ID o usuario en la barra superior o presiona el botón <span className="text-rose-400 font-bold">+</span> para iniciar tu propia transmisión en vivo.
+        </p>
+      </div>
+    );
+  }
 
   // Auto scroll chat to bottom when new comment arrives
   useEffect(() => {
@@ -104,7 +159,7 @@ export const LiveStreamViewer: React.FC<LiveStreamViewerProps> = ({
             </div>
 
             <button
-              onClick={() => setIsFollowing(!isFollowing)}
+              onClick={handleFollowClick}
               className={`px-3 py-1 rounded-full text-[11px] font-black transition-all duration-200 active:scale-95 ${
                 isFollowing
                   ? 'bg-stone-800/80 text-stone-300 border border-white/10'
@@ -116,7 +171,21 @@ export const LiveStreamViewer: React.FC<LiveStreamViewerProps> = ({
           </div>
 
           {/* Right Top Status Controls */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1.5">
+            {onToggleOnlyMutualLive && (
+              <button
+                onClick={onToggleOnlyMutualLive}
+                title="Filtrar transmisiones solo de personas que se siguen mutuamente"
+                className={`px-2.5 py-1 rounded-full text-[10px] font-black border transition-all flex items-center space-x-1 ${
+                  onlyMutualLive
+                    ? 'bg-purple-600/90 text-white border-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.5)]'
+                    : 'bg-stone-900/70 text-stone-300 border-white/10 hover:text-white'
+                }`}
+              >
+                <span>🤝 Amigos</span>
+              </button>
+            )}
+
             <div className="bg-stone-900/70 backdrop-blur-xl px-2.5 py-1 rounded-full text-xs font-bold flex items-center space-x-1 border border-white/10">
               <Users className="w-3.5 h-3.5 text-rose-400" />
               <span>{streamer.viewerCount.toLocaleString()}</span>
@@ -195,8 +264,11 @@ export const LiveStreamViewer: React.FC<LiveStreamViewerProps> = ({
         </button>
 
         {/* Share Button */}
-        <button className="flex flex-col items-center space-y-1">
-          <div className="p-3 bg-stone-900/75 rounded-full border border-white/10 text-stone-200 shadow-xl backdrop-blur-md transition-all hover:bg-stone-800">
+        <button
+          onClick={() => setIsShareOpen(true)}
+          className="flex flex-col items-center space-y-1 transition-all active:scale-95"
+        >
+          <div className="p-3 bg-stone-900/75 hover:bg-stone-800 rounded-full border border-white/10 text-stone-200 shadow-xl backdrop-blur-md">
             <Share2 className="w-5 h-5" />
           </div>
           <span className="text-[10px] font-black text-stone-300">Compartir</span>
@@ -289,6 +361,13 @@ export const LiveStreamViewer: React.FC<LiveStreamViewerProps> = ({
           </button>
         </form>
       </div>
+
+      <SocialShareModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        title={streamer.streamTitle}
+        streamerName={streamer.displayName}
+      />
     </div>
   );
 };

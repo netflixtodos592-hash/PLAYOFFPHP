@@ -1,6 +1,6 @@
 {
-  "name": "TikTok LIVE - Monetización",
-  "description": "Plataforma de video corto y en vivo con sistema de monedas, regalos virtuales, batallas PK 1v1, chat en tiempo real y panel de retiros para creadores.",
+  "name": "LiveStream - Transmisiones & Videos",
+  "description": "Plataforma de video corto y transmisiones en vivo con pasarela de pago con tarjeta, monedas, regalos virtuales, batallas PK 1v1 y subida de contenido.",
   "requestFramePermissions": [
     "camera",
     "microphone"

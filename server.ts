@@ -13,37 +13,18 @@ app.use(express.json());
 const PORT = 3000;
 const httpServer = createServer(app);
 
-// Global In-Memory Database State
+// Global In-Memory Database State (Starts cleanly from 0 coins & 0 diamonds until users recharge/earn)
 let userWallet: UserWallet = {
-  coins: 1050,
-  diamonds: 12400, // equivalent to ~$62.00 USD creator balance
-  totalCoinsSpent: 350,
-  totalDiamondsEarned: 12400,
-  usdBalance: 62.00
+  coins: 0,
+  diamonds: 0,
+  totalCoinsSpent: 0,
+  totalDiamondsEarned: 0,
+  usdBalance: 0.00
 };
 
 let streamersList: Streamer[] = [...MOCK_STREAMERS];
 
-let withdrawalHistory: WithdrawalRecord[] = [
-  {
-    id: 'wd-101',
-    amountDiamonds: 10000,
-    amountUSD: 50.00,
-    paymentMethod: 'paypal',
-    accountDetails: 'usuario@ejemplo.com',
-    status: 'completado',
-    date: '2026-08-01 14:32'
-  },
-  {
-    id: 'wd-102',
-    amountDiamonds: 5000,
-    amountUSD: 25.00,
-    paymentMethod: 'mercadopago',
-    accountDetails: 'CVU: 0000003100028192039',
-    status: 'completado',
-    date: '2026-08-05 18:15'
-  }
-];
+let withdrawalHistory: WithdrawalRecord[] = [];
 
 let activePKBattle: PKBattleState = {
   id: 'pk-99',
@@ -390,18 +371,22 @@ app.get('/api/streamers', (req, res) => {
 
 // 6. User Start LIVE Stream
 app.post('/api/streamers/go-live', (req, res) => {
-  const { title, category, goalTitle, goalCoins } = req.body;
+  const { title, category, goalTitle, goalCoins, hostName, hostAvatar, username, email } = req.body;
+
+  const uname = username || (email ? email.split('@')[0] : 'usuario_live');
+  const dname = hostName || 'Usuario en Vivo';
+  const uavatar = hostAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80';
 
   const newStream: Streamer = {
-    id: `user-stream-${Date.now()}`,
-    username: 'mi_canal_live',
-    displayName: 'Tú en Vivo 🔴',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-    bio: 'Transmisión oficial en vivo. ¡Gracias por el apoyo y los regalos!',
-    followers: 12500,
+    id: `stream-${uname}-${Date.now()}`,
+    username: uname,
+    displayName: `${dname} 🔴`,
+    avatar: uavatar,
+    bio: `Canal oficial de ${dname}. Transmisión en vivo iniciada por ID/usuario.`,
+    followers: 1250,
     isLive: true,
     category: category || 'Charla',
-    streamTitle: title || '🔥 Mi En Vivo Monetizado - ¡Envia regalos y saluda en pantalla!',
+    streamTitle: title || `🔥 En Vivo de ${dname} - ¡Saluda y envía regalos!`,
     viewerCount: 1,
     diamondCount: userWallet.diamonds,
     streamBgGradient: 'from-fuchsia-950 via-purple-900 to-black',
@@ -413,11 +398,14 @@ app.post('/api/streamers/go-live', (req, res) => {
     }
   };
 
+  // Remove previous stream from same user if existed
+  streamersList = streamersList.filter(s => s.username !== uname);
   streamersList.unshift(newStream);
 
   res.json({
     success: true,
-    streamer: newStream
+    streamer: newStream,
+    allStreamers: streamersList
   });
 });
 

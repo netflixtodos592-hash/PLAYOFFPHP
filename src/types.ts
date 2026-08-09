@@ -58,12 +58,16 @@ export interface Streamer {
   avatar: string;
   bio: string;
   followers: number;
+  following?: number;
+  isMutual?: boolean;
   isLive: boolean;
   category: 'Gaming' | 'Música' | 'Charla' | 'Arte & Belleza' | 'ASMR' | 'Cocina';
   streamTitle: string;
   viewerCount: number;
   diamondCount: number;
   streamBgGradient: string;
+  privacy?: 'public' | 'followers' | 'coins';
+  coinPrice?: number;
   videoPlaceholderUrl?: string;
   giftGoal?: {
     title: string;

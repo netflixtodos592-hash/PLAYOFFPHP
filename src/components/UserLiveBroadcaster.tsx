@@ -1,40 +1,55 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { UserWallet, GiftItem, Streamer } from '../types';
-import { GIFTS_CATALOG } from '../data/gifts';
-import { Video, Mic, MicOff, VideoOff, Sparkles, Radio, Users, Gem, Gift, Send, Play, X, ShieldAlert } from 'lucide-react';
+import { UserWallet, GiftItem, LiveComment } from '../types';
+import { UserAccount } from './AuthModal';
+import { Video, Mic, MicOff, VideoOff, Radio, Users, Gem, Gift, Send, Play, X, Maximize2, Minimize2, Share2, Globe, Coins, Lock } from 'lucide-react';
+import { SocialShareModal } from './SocialShareModal';
 
 interface UserLiveBroadcasterProps {
   isOpen: boolean;
   onClose: () => void;
   wallet: UserWallet;
+  currentUser?: UserAccount;
   onSimulateIncomingGift: (gift: GiftItem, fanName: string, quantity: number) => void;
   onUpdateWallet: (newWallet: UserWallet) => void;
+  onStreamCreated?: (newStream: any) => void;
 }
 
 export const UserLiveBroadcaster: React.FC<UserLiveBroadcasterProps> = ({
   isOpen,
   onClose,
   wallet,
+  currentUser,
   onSimulateIncomingGift,
-  onUpdateWallet
+  onUpdateWallet,
+  onStreamCreated
 }) => {
-  const [streamTitle, setStreamTitle] = useState('🔥 charlando y jugando en vivo | envia regalos para cantar');
+  const [streamTitle, setStreamTitle] = useState('🔥 Transmitiendo en vivo | ¡Bienvenidos a mi canal!');
   const [category, setCategory] = useState<'Gaming' | 'Música' | 'Charla' | 'ASMR' | 'Cocina'>('Charla');
   const [goalTitle, setGoalTitle] = useState('Meta: Cohete Espacial 🚀');
   const [goalTarget, setGoalTarget] = useState(1000);
+  const [privacy, setPrivacy] = useState<'public' | 'followers' | 'coins'>('public');
+  const [coinPrice, setCoinPrice] = useState<number>(10);
   const [isLiveActive, setIsLiveActive] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
+  // Live Comments Overlay State (Clean real comments)
+  const [liveComments, setLiveComments] = useState<LiveComment[]>([]);
+  const [inputComment, setInputComment] = useState('');
 
   // Camera & Mic States
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isAudioOn, setIsAudioOn] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Stats during active stream
-  const [liveViewers, setLiveViewers] = useState(128);
-  const [liveDiamonds, setLiveDiamonds] = useState(0);
-  const [simFanName, setSimFanName] = useState('Fan_VIP_Gamer');
-  const [selectedSimGift, setSelectedSimGift] = useState<GiftItem>(GIFTS_CATALOG[0]);
-  const [simQty, setSimQty] = useState(1);
+  // Real stats starting cleanly from 1 viewer (Host) & real wallet diamonds
+  const [liveViewers, setLiveViewers] = useState(1);
+  const [liveDiamonds, setLiveDiamonds] = useState(wallet.diamonds || 0);
+
+  // Sync live diamonds with wallet
+  useEffect(() => {
+    setLiveDiamonds(wallet.diamonds || 0);
+  }, [wallet.diamonds]);
 
   // Camera initialization
   useEffect(() => {
@@ -46,7 +61,7 @@ export const UserLiveBroadcaster: React.FC<UserLiveBroadcasterProps> = ({
           }
         })
         .catch(err => {
-          console.log('Camera permission optional/not available, showing video canvas background:', err);
+          console.log('Camera permission optional/not available:', err);
         });
     }
 
@@ -57,17 +72,6 @@ export const UserLiveBroadcaster: React.FC<UserLiveBroadcasterProps> = ({
       }
     };
   }, [isOpen, isVideoOn]);
-
-  // Viewer fluctuation interval when live
-  useEffect(() => {
-    if (!isLiveActive) return;
-
-    const interval = setInterval(() => {
-      setLiveViewers(prev => Math.max(10, prev + Math.floor(Math.random() * 9) - 4));
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [isLiveActive]);
 
   if (!isOpen) return null;
 
@@ -80,244 +84,269 @@ export const UserLiveBroadcaster: React.FC<UserLiveBroadcasterProps> = ({
           title: streamTitle,
           category,
           goalTitle,
-          goalCoins: goalTarget
+          goalCoins: goalTarget,
+          hostName: currentUser?.displayName || 'Usuario',
+          hostAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+          email: currentUser?.email,
+          username: currentUser?.email ? currentUser.email.split('@')[0] : 'usuario_live'
         })
       });
       const data = await res.json();
-      if (data.success) {
-        setIsLiveActive(true);
+      if (data.success && data.streamer && onStreamCreated) {
+        onStreamCreated(data.streamer);
       }
-    } catch (e) {
-      setIsLiveActive(true);
-    }
+    } catch (e) {}
+
+    setIsLiveActive(true);
+    setIsFullScreen(true);
+    setLiveComments([
+      {
+        id: 'sys-start',
+        userId: 'system',
+        username: 'Sistema',
+        userAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+        message: '🟢 Transmisión iniciada en vivo. Tu ID/canal ya está disponible para que todos te busquen y entren a verte.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
   };
 
-  const handleTriggerSimulatedFanGift = () => {
-    if (!selectedSimGift) return;
-    const earnedDiamonds = Math.floor(selectedSimGift.coinPrice * simQty * 0.5);
-    setLiveDiamonds(prev => prev + earnedDiamonds);
+  const handleSendBroadcasterComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputComment.trim()) return;
 
-    onSimulateIncomingGift(selectedSimGift, simFanName, simQty);
+    const myComment: LiveComment = {
+      id: `c-${Date.now()}`,
+      userId: currentUser?.email || 'host-current',
+      username: currentUser?.displayName || 'Tú (Host)',
+      userAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      badge: 'Host',
+      badgeLevel: 99,
+      message: inputComment.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setLiveComments(prev => [...prev, myComment]);
+    setInputComment('');
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-lg animate-fade-in">
-      <div className="relative w-full max-w-xl bg-stone-950/90 backdrop-blur-2xl border border-white/10 rounded-[32px] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.9)] flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/90 backdrop-blur-xl animate-fade-in">
+      <div className={`relative w-full ${isFullScreen || isLiveActive ? 'max-w-md h-[95vh]' : 'max-w-xl max-h-[92vh]'} bg-stone-950/95 backdrop-blur-2xl border border-white/10 rounded-[32px] overflow-hidden shadow-[0_0_60px_rgba(0,0,0,0.95)] flex flex-col justify-between transition-all duration-300`}>
         {/* Header */}
-        <div className="bg-stone-900/80 backdrop-blur-md px-5 py-3.5 border-b border-white/10 flex items-center justify-between">
+        <div className="bg-stone-900/90 backdrop-blur-md px-4 py-3 border-b border-white/10 flex items-center justify-between z-20">
           <div className="flex items-center space-x-2.5">
             <div className="p-2 bg-rose-600/20 rounded-xl border border-rose-500/30 shadow-[0_0_12px_rgba(244,63,94,0.3)]">
               <Radio className="w-5 h-5 text-rose-500 animate-pulse" />
             </div>
             <div>
-              <h2 className="text-base font-black text-white tracking-wide">Estudio de Transmisión en Vivo</h2>
-              <p className="text-[11px] text-stone-400 font-medium">Emite en directo y recibe regalos monetizables</p>
+              <h2 className="text-sm font-black text-white tracking-wide">
+                {isLiveActive ? 'Transmisión EN VIVO en Directo' : 'Estudio de Transmisión'}
+              </h2>
+              <p className="text-[10px] text-stone-400 font-medium">Emite en vivo y recibe comentarios y regalos</p>
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="text-stone-400 hover:text-white font-bold p-1 text-xl transition-all"
-          >
-            ✕
-          </button>
+          <div className="flex items-center space-x-2">
+            {isLiveActive && (
+              <button
+                onClick={() => setIsFullScreen(!isFullScreen)}
+                className="p-1.5 rounded-lg bg-stone-800 text-stone-300 hover:text-white"
+                title="Cambiar Pantalla Completa"
+              >
+                {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-stone-400 hover:text-white font-bold p-1 text-xl transition-all"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
-        {/* Camera / Video Viewport Area */}
-        <div className="relative w-full h-64 bg-gradient-to-br from-purple-950 via-stone-900 to-black overflow-hidden flex items-center justify-center border-b border-white/10">
+        {/* Camera & Video Viewport with Live Overlays */}
+        <div className={`relative w-full ${isLiveActive ? 'flex-1' : 'h-64'} bg-gradient-to-br from-purple-950 via-stone-900 to-black overflow-hidden flex flex-col justify-between border-b border-white/10`}>
           {isVideoOn ? (
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-cover"
             />
           ) : (
-            <div className="flex flex-col items-center justify-center space-y-2 text-stone-500">
-              <VideoOff className="w-12 h-12" />
-              <span className="text-xs font-extrabold">Cámara Apagada</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center space-y-2 text-stone-500 bg-stone-950">
+              <VideoOff className="w-12 h-12 text-rose-500/80" />
+              <span className="text-xs font-extrabold text-stone-400">Cámara Apagada</span>
             </div>
           )}
 
-          {/* Live Overlay Badges */}
-          <div className="absolute top-3 left-3 flex items-center space-x-2">
-            {isLiveActive ? (
-              <div className="bg-rose-600 text-white font-black text-[11px] px-3 py-1 rounded-full flex items-center space-x-1.5 shadow-[0_0_15px_rgba(244,63,94,0.6)] animate-pulse">
-                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                <span>EN VIVO</span>
-              </div>
-            ) : (
-              <div className="bg-stone-900/80 backdrop-blur-md text-stone-300 font-extrabold text-[11px] px-3 py-1 rounded-full border border-white/10">
-                Vista Previa
-              </div>
-            )}
+          {/* Top Overlays: Live Badge, Viewer Count, Diamonds */}
+          <div className="relative z-10 p-3 flex justify-between items-start bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+            <div className="flex items-center space-x-2">
+              {isLiveActive ? (
+                <div className="bg-rose-600 text-white font-black text-[10px] px-2.5 py-1 rounded-full flex items-center space-x-1 shadow-[0_0_15px_rgba(244,63,94,0.6)] animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  <span>EN VIVO</span>
+                </div>
+              ) : (
+                <div className="bg-stone-900/80 backdrop-blur-md text-stone-300 font-extrabold text-[10px] px-2.5 py-1 rounded-full border border-white/10">
+                  Vista Previa
+                </div>
+              )}
+
+              {isLiveActive && (
+                <div className="bg-black/70 backdrop-blur-md text-white font-bold text-[10px] px-2.5 py-1 rounded-full flex items-center space-x-1 border border-white/10">
+                  <Users className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{liveViewers} viendo</span>
+                </div>
+              )}
+            </div>
 
             {isLiveActive && (
-              <div className="bg-black/70 backdrop-blur-md text-white font-bold text-[11px] px-2.5 py-1 rounded-full flex items-center space-x-1 border border-white/10">
-                <Users className="w-3.5 h-3.5 text-rose-400" />
-                <span>{liveViewers}</span>
+              <div className="bg-purple-950/90 border border-purple-500/60 text-purple-200 font-black text-xs px-3 py-1 rounded-full flex items-center space-x-1 shadow-[0_0_15px_rgba(168,85,247,0.4)] backdrop-blur-md">
+                <Gem className="w-3.5 h-3.5 text-purple-400 fill-purple-400" />
+                <span>+{liveDiamonds.toLocaleString()} 💎</span>
               </div>
             )}
           </div>
 
-          {/* Live Diamond Earnings Counter during stream */}
+          {/* REAL-TIME FLOATING COMMENTS ON LIVE BROADCASTER SCREEN */}
           {isLiveActive && (
-            <div className="absolute top-3 right-3 bg-purple-950/90 border border-purple-500/60 text-purple-200 font-black text-xs px-3 py-1.5 rounded-full flex items-center space-x-1.5 shadow-[0_0_15px_rgba(168,85,247,0.4)] backdrop-blur-md">
-              <Gem className="w-4 h-4 text-purple-400 fill-purple-400" />
-              <span>+{liveDiamonds.toLocaleString()} 💎 Ganados</span>
+            <div className="relative z-10 p-3 flex flex-col justify-end space-y-2 mt-auto bg-gradient-to-t from-black/90 via-black/40 to-transparent max-h-56">
+              <div className="space-y-1.5 overflow-y-auto max-h-40 pr-1 scrollbar-none">
+                {liveComments.map((c) => (
+                  <div
+                    key={c.id}
+                    className="inline-flex items-start space-x-1.5 bg-black/60 backdrop-blur-md border border-white/10 rounded-2xl px-3 py-1.5 text-xs max-w-[90%]"
+                  >
+                    <span className={`font-black ${c.badge === 'Host' ? 'text-yellow-400' : 'text-rose-400'}`}>
+                      {c.username}:
+                    </span>
+                    <span className="text-white font-medium">{c.message}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Broadcaster Quick Comment Input Bar */}
+              <form onSubmit={handleSendBroadcasterComment} className="flex items-center space-x-2 pt-1">
+                <input
+                  type="text"
+                  placeholder="Responde a tus espectadores en vivo..."
+                  value={inputComment}
+                  onChange={(e) => setInputComment(e.target.value)}
+                  className="flex-1 bg-black/70 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white placeholder-stone-400 focus:outline-none focus:border-rose-500"
+                />
+                <button
+                  type="submit"
+                  className="p-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold shadow-md active:scale-95"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </form>
             </div>
           )}
 
-          {/* Camera Controls Overlay */}
-          <div className="absolute bottom-3 left-3 flex items-center space-x-2">
-            <button
-              onClick={() => setIsVideoOn(!isVideoOn)}
-              className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition-all active:scale-95"
-            >
-              {isVideoOn ? <Video className="w-4 h-4 text-emerald-400" /> : <VideoOff className="w-4 h-4 text-rose-400" />}
-            </button>
-            <button
-              onClick={() => setIsAudioOn(!isAudioOn)}
-              className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition-all active:scale-95"
-            >
-              {isAudioOn ? <Mic className="w-4 h-4 text-emerald-400" /> : <MicOff className="w-4 h-4 text-rose-400" />}
-            </button>
+          {/* Camera & Mic Controls Overlay */}
+          <div className="relative z-10 p-2.5 flex items-center justify-between bg-black/60 backdrop-blur-md border-t border-white/10">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsVideoOn(!isVideoOn)}
+                className="p-2 rounded-full bg-stone-900/80 hover:bg-stone-800 text-white border border-white/10 transition-all active:scale-95"
+                title="Cámara"
+              >
+                {isVideoOn ? <Video className="w-4 h-4 text-emerald-400" /> : <VideoOff className="w-4 h-4 text-rose-400" />}
+              </button>
+              <button
+                onClick={() => setIsAudioOn(!isAudioOn)}
+                className="p-2 rounded-full bg-stone-900/80 hover:bg-stone-800 text-white border border-white/10 transition-all active:scale-95"
+                title="Micrófono"
+              >
+                {isAudioOn ? <Mic className="w-4 h-4 text-emerald-400" /> : <MicOff className="w-4 h-4 text-rose-400" />}
+              </button>
+              <button
+                onClick={() => setIsShareOpen(true)}
+                className="p-2 rounded-full bg-rose-600/30 hover:bg-rose-600/50 text-white border border-rose-500/40 transition-all active:scale-95 flex items-center space-x-1"
+                title="Compartir Live en Redes"
+              >
+                <Share2 className="w-4 h-4 text-rose-300" />
+              </button>
+            </div>
+
+            {isLiveActive && (
+              <button
+                onClick={() => setIsLiveActive(false)}
+                className="bg-rose-600/90 hover:bg-rose-600 text-white font-black text-xs px-3.5 py-1.5 rounded-full shadow-md transition-all active:scale-95"
+              >
+                Finalizar Live
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Content Controls & Configuration */}
-        <div className="p-4 space-y-4 overflow-y-auto max-h-80 text-xs">
-          {!isLiveActive ? (
-            /* Setup Phase */
-            <div className="space-y-3">
+        {/* Setup Controls (Shown before going live) */}
+        {!isLiveActive && (
+          <div className="p-4 space-y-3 text-xs overflow-y-auto">
+            <div>
+              <label className="block text-stone-400 font-bold uppercase tracking-wider mb-1">
+                Título de la Transmisión
+              </label>
+              <input
+                type="text"
+                value={streamTitle}
+                onChange={(e) => setStreamTitle(e.target.value)}
+                placeholder="Ej. Charlando y jugando en vivo..."
+                className="w-full bg-stone-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-stone-400 font-bold uppercase tracking-wider mb-1">
-                  Título de la Transmisión
-                </label>
+                <label className="block text-stone-400 font-bold uppercase tracking-wider mb-1">Categoría</label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as any)}
+                  className="w-full bg-stone-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500"
+                >
+                  <option value="Charla">Charla 🗣️</option>
+                  <option value="Gaming">Gaming 🎮</option>
+                  <option value="Música">Música 🎵</option>
+                  <option value="ASMR">ASMR 🎧</option>
+                  <option value="Cocina">Cocina 🍕</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-stone-400 font-bold uppercase tracking-wider mb-1">Meta de Monedas</label>
                 <input
                   type="text"
-                  value={streamTitle}
-                  onChange={e => setStreamTitle(e.target.value)}
-                  className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3.5 py-2.5 font-bold text-white focus:outline-none focus:border-rose-500"
-                  placeholder="Escribe un título llamativo..."
+                  value={goalTitle}
+                  onChange={(e) => setGoalTitle(e.target.value)}
+                  placeholder="Meta: Cohete Espacial 🚀"
+                  className="w-full bg-stone-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-rose-500"
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase tracking-wider mb-1">
-                    Categoría
-                  </label>
-                  <select
-                    value={category}
-                    onChange={e => setCategory(e.target.value as any)}
-                    className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2.5 font-bold text-white focus:outline-none focus:border-rose-500"
-                  >
-                    <option value="Charla">💬 Charla / Just Chatting</option>
-                    <option value="Gaming">🎮 Gaming</option>
-                    <option value="Música">🎸 Música en Vivo</option>
-                    <option value="ASMR">🎧 ASMR & Chill</option>
-                    <option value="Cocina">🍕 Cocina & Recetas</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-stone-400 font-bold uppercase tracking-wider mb-1">
-                    Meta de Monedas en LIVE
-                  </label>
-                  <input
-                    type="number"
-                    value={goalTarget}
-                    onChange={e => setGoalTarget(parseInt(e.target.value) || 500)}
-                    className="w-full bg-stone-900 border border-stone-800 rounded-xl px-3 py-2.5 font-bold text-yellow-400 focus:outline-none focus:border-rose-500"
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={handleStartLive}
-                className="w-full bg-gradient-to-r from-rose-600 via-pink-600 to-purple-600 hover:from-rose-500 hover:to-purple-500 text-white font-black text-sm py-3.5 rounded-2xl shadow-xl flex items-center justify-center space-x-2 transition-all active:scale-95"
-              >
-                <Play className="w-5 h-5 fill-white" />
-                <span>INICIAR TRANSMISIÓN EN VIVO AHORA</span>
-              </button>
             </div>
-          ) : (
-            /* Active Live Broadcaster Dashboard & Audience Simulator */
-            <div className="space-y-4">
-              <div className="bg-purple-950/40 border border-purple-800/50 p-3 rounded-2xl flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] uppercase font-bold text-purple-300">Monetización del Live en Curso</div>
-                  <div className="text-sm font-black text-white flex items-center space-x-1.5 mt-0.5">
-                    <Gem className="w-4 h-4 text-purple-400 fill-purple-400" />
-                    <span>{liveDiamonds.toLocaleString()} Diamantes = ${(liveDiamonds * 0.005).toFixed(2)} USD</span>
-                  </div>
-                </div>
-                <div className="text-right text-[11px] font-bold text-yellow-400">
-                  Meta: {goalTarget} 🪙
-                </div>
-              </div>
 
-              {/* Audience Simulation Tool for testing gift receipts */}
-              <div className="bg-stone-900 border border-stone-800 p-3.5 rounded-2xl space-y-3">
-                <div className="flex items-center space-x-2 text-rose-400 font-extrabold">
-                  <Gift className="w-4 h-4" />
-                  <span>Simulador de Donaciones y Regalos de Espectadores</span>
-                </div>
-                <p className="text-[11px] text-stone-400">
-                  Usa este panel para simular que tus fanáticos en vivo te envían regalos en tiempo real para ver las animaciones y la acumulación de diamantes.
-                </p>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-stone-400 font-bold block mb-1">Nombre de Fan</label>
-                    <input
-                      type="text"
-                      value={simFanName}
-                      onChange={e => setSimFanName(e.target.value)}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1.5 text-xs text-white"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] text-stone-400 font-bold block mb-1">Regalo a Enviar</label>
-                    <select
-                      value={selectedSimGift.id}
-                      onChange={e => {
-                        const g = GIFTS_CATALOG.find(gift => gift.id === e.target.value);
-                        if (g) setSelectedSimGift(g);
-                      }}
-                      className="w-full bg-stone-950 border border-stone-800 rounded-lg px-2 py-1.5 text-xs text-white"
-                    >
-                      {GIFTS_CATALOG.map(g => (
-                        <option key={g.id} value={g.id}>
-                          {g.icon} {g.spanishName} ({g.coinPrice} 🪙)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleTriggerSimulatedFanGift}
-                  className="w-full bg-yellow-500 hover:bg-yellow-400 text-stone-950 font-black text-xs py-2.5 rounded-xl shadow-md flex items-center justify-center space-x-1.5"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Simular envío de {selectedSimGift.icon} {selectedSimGift.spanishName}</span>
-                </button>
-              </div>
-
-              <button
-                onClick={() => setIsLiveActive(false)}
-                className="w-full bg-rose-950 hover:bg-rose-900 border border-rose-700 text-rose-200 font-black text-xs py-2.5 rounded-xl transition-all"
-              >
-                Finalizar Transmisión en Vivo
-              </button>
-            </div>
-          )}
-        </div>
+            <button
+              onClick={handleStartLive}
+              className="w-full bg-gradient-to-r from-rose-600 via-pink-600 to-purple-600 hover:from-rose-500 hover:to-purple-500 text-white font-black text-sm py-3 rounded-2xl shadow-[0_0_25px_rgba(244,63,94,0.6)] transition-all duration-200 active:scale-95 flex items-center justify-center space-x-2 mt-2"
+            >
+              <Radio className="w-5 h-5 text-yellow-300 animate-pulse" />
+              <span>TRANSMITIR EN VIVO AHORA</span>
+            </button>
+          </div>
+        )}
       </div>
+
+      <SocialShareModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        title={streamTitle}
+        streamerName={currentUser?.displayName || 'Transmisión en Vivo'}
+      />
     </div>
   );
 };

@@ -2,32 +2,12 @@ import { Streamer, TopGifter } from '../types';
 
 export const MOCK_STREAMERS: Streamer[] = [
   {
-    id: 'streamer-1',
-    username: 'sofi_live',
-    displayName: 'Sofi Gaming 🎮',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    bio: 'Directos de Warzone y Minecraft todos los días 🚀 | Meta: 20k diamantes para mi nueva PC',
-    followers: 245000,
-    isLive: true,
-    category: 'Gaming',
-    streamTitle: '🔥 JUGANDO CON SEGUIDORES Y PROBANDO NUEVA SKIN | REGALOS x2 EN PUNTOS 🔥',
-    viewerCount: 1420,
-    diamondCount: 18450,
-    streamBgGradient: 'from-violet-900 via-purple-900 to-indigo-950',
-    giftGoal: {
-      title: 'Meta: Teclado Mecánico RGB ⌨️',
-      currentCoins: 4200,
-      targetCoins: 5000,
-      rewardGift: 'Cohete Espacial'
-    }
-  },
-  {
     id: 'streamer-2',
     username: 'carlos_music',
     displayName: 'Carlos Guitarras 🎸',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
     bio: 'Cantando tus canciones favoritas en vivo. Envíame un regalo y te dedico un tema 🎵',
-    followers: 512000,
+    followers: 0,
     isLive: true,
     category: 'Música',
     streamTitle: '🎤 Noche de Acústico & Peticiones en Vivo | ¿Qué canción quieres escuchar?',
@@ -47,7 +27,7 @@ export const MOCK_STREAMERS: Streamer[] = [
     displayName: 'Valen ASMR & Chill 💤',
     avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
     bio: 'Relájate después de un largo día. Tapping, whisper, binaural 🎧',
-    followers: 189000,
+    followers: 0,
     isLive: true,
     category: 'ASMR',
     streamTitle: '🎧 ASMR Suave para Dormir Profundo | Sonidos con Micrófono de Cristal ✨',
@@ -67,7 +47,7 @@ export const MOCK_STREAMERS: Streamer[] = [
     displayName: 'Chef Mateo 👨‍🍳',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
     bio: 'Recetas rápidas de cocina italiana y postres deliciosos en tiempo real 🍕',
-    followers: 98000,
+    followers: 0,
     isLive: true,
     category: 'Cocina',
     streamTitle: '🍕 HACIENDO PIZZA ARTESANAL DESDE CERO | Respondiendo preguntas de cocina',

@@ -13,7 +13,7 @@ export const BottomNavbar: React.FC<BottomNavbarProps> = ({
   onOpenBroadcasterModal,
 }) => {
   return (
-    <nav className="w-full max-w-md mx-auto bg-stone-950/85 backdrop-blur-xl border-t border-white/10 text-white px-4 py-2 flex items-center justify-around z-40 shadow-[0_-10px_25px_rgba(0,0,0,0.5)]">
+    <nav className="w-full max-w-md mx-auto bg-stone-950/85 backdrop-blur-xl border-t border-white/10 text-white px-3 py-2 flex items-center justify-around z-40 shadow-[0_-10px_25px_rgba(0,0,0,0.5)]">
       {/* Feed Button */}
       <button
         onClick={() => onTabChange('feed')}
